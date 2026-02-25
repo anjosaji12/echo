@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import PartnerApp from './PartnerApp';
 import {
   User,
   Calendar,
@@ -23,6 +24,7 @@ import {
   X,
   Loader2,
   AlertCircle,
+  Truck,
 } from 'lucide-react';
 
 // Firebase
@@ -82,7 +84,7 @@ const ErrorBanner = ({ message, onDismiss }) => (
 );
 
 // ─── Main App ──────────────────────────────────────────────────────────────────
-export default function App() {
+export default function App({ onSwitchPortal }) {
   // ── Auth state ──────────────────────────────────
   const [firebaseUser, setFirebaseUser] = useState(null);   // raw Firebase user
   const [userProfile, setUserProfile] = useState(null);   // Firestore profile doc
@@ -438,6 +440,14 @@ export default function App() {
             <span className="text-sm font-bold text-gray-700 hidden sm:block">{userProfile?.name}</span>
             <span className="text-[10px] text-gray-400 font-medium">{userProfile?.area || userProfile?.email}</span>
           </div>
+          {onSwitchPortal && (
+            <button
+              onClick={onSwitchPortal}
+              className="hidden sm:flex items-center gap-1.5 text-[10px] font-black text-gray-400 hover:text-emerald-600 transition-colors uppercase tracking-widest"
+            >
+              <Truck size={12} /> Partner
+            </button>
+          )}
           <button
             onClick={handleLogout}
             className="p-2.5 bg-gray-50 text-gray-400 hover:text-red-500 rounded-xl transition-colors flex items-center justify-center"
@@ -446,6 +456,7 @@ export default function App() {
           </button>
         </div>
       </nav>
+
 
       <div className="max-w-6xl mx-auto p-6 md:p-10 animate-in fade-in duration-500">
         <header className="mb-10 text-center md:text-left">
@@ -543,15 +554,15 @@ export default function App() {
                               type="button"
                               onClick={() => toggleWasteType(type.id)}
                               className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all mb-1 ${selectedTypes.includes(type.id)
-                                  ? 'bg-emerald-50 text-emerald-700'
-                                  : 'hover:bg-gray-50 text-gray-600'
+                                ? 'bg-emerald-50 text-emerald-700'
+                                : 'hover:bg-gray-50 text-gray-600'
                                 }`}
                             >
                               <div className="flex items-center gap-3">
                                 <div className={`w-3 h-3 rounded-full ${type.id === 'plastic' ? 'bg-emerald-500' :
-                                    type.id === 'paper' ? 'bg-amber-500' :
-                                      type.id === 'electronic' ? 'bg-purple-500' :
-                                        type.id === 'organic' ? 'bg-green-500' : 'bg-slate-500'
+                                  type.id === 'paper' ? 'bg-amber-500' :
+                                    type.id === 'electronic' ? 'bg-purple-500' :
+                                      type.id === 'organic' ? 'bg-green-500' : 'bg-slate-500'
                                   }`} />
                                 <span className="font-bold text-sm">{type.label}</span>
                               </div>
@@ -590,8 +601,8 @@ export default function App() {
                       readOnly={!isEditingAddress}
                       placeholder={isEditingAddress ? 'Type custom address…' : 'Enter pickup address'}
                       className={`w-full pl-11 pr-4 py-4 rounded-xl font-bold outline-none text-sm transition-all ${isEditingAddress
-                          ? 'bg-white border-emerald-500 border-2 shadow-inner placeholder:text-gray-300'
-                          : 'bg-gray-100 border-transparent border-2 text-gray-500'
+                        ? 'bg-white border-emerald-500 border-2 shadow-inner placeholder:text-gray-300'
+                        : 'bg-gray-100 border-transparent border-2 text-gray-500'
                         }`}
                     />
                   </div>
@@ -631,8 +642,8 @@ export default function App() {
                   type="submit"
                   disabled={selectedTypes.length === 0 || bookingBusy}
                   className={`w-full py-5 rounded-2xl font-black shadow-lg transition-all uppercase tracking-[0.2em] text-xs flex items-center justify-center gap-2 ${selectedTypes.length > 0 && !bookingBusy
-                      ? 'bg-emerald-600 text-white hover:bg-emerald-700'
-                      : 'bg-gray-200 text-gray-400 cursor-not-allowed shadow-none'
+                    ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                    : 'bg-gray-200 text-gray-400 cursor-not-allowed shadow-none'
                     }`}
                 >
                   {bookingBusy ? <Loader2 className="animate-spin" size={18} /> : 'Schedule Pickup'}
@@ -722,3 +733,77 @@ export default function App() {
     </div>
   );
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Portal selector — root entry point rendered by index.js
+// ─────────────────────────────────────────────────────────────────────────────
+export function PortalRoot() {
+  const [portal, setPortal] = useState(null); // null | 'customer' | 'partner'
+
+  if (portal === 'customer') return <App onSwitchPortal={() => setPortal(null)} />;
+  if (portal === 'partner') return <PartnerApp onSwitchPortal={() => setPortal(null)} />;
+
+  // Landing selector
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950 flex flex-col items-center justify-center p-6 font-sans overflow-hidden relative">
+      {/* Ambient blobs */}
+      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-1/4 right-1/4 w-72 h-72 bg-teal-400/10 rounded-full blur-3xl pointer-events-none" />
+
+      {/* Logo */}
+      <div className="text-center mb-16 animate-in zoom-in-95 fade-in duration-700">
+        <div className="inline-flex items-center justify-center p-4 bg-emerald-500 rounded-2xl mb-5 shadow-2xl shadow-emerald-500/30">
+          <Leaf className="text-white w-10 h-10" />
+        </div>
+        <h1 className="text-5xl font-black text-white tracking-tighter uppercase mb-3">
+          Eco<span className="text-emerald-400">Collect</span>
+        </h1>
+        <p className="text-slate-400 font-semibold text-lg">Intelligent Waste Management Platform</p>
+      </div>
+
+      {/* Portal cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-2xl animate-in fade-in slide-in-from-bottom-8 duration-700 delay-200">
+        {/* Customer card */}
+        <button
+          onClick={() => setPortal('customer')}
+          className="group relative bg-white/5 hover:bg-white/10 border border-white/10 hover:border-emerald-500/60 rounded-[2rem] p-8 text-left transition-all duration-300 hover:shadow-2xl hover:shadow-emerald-500/10 active:scale-95 overflow-hidden"
+        >
+          <div className="p-4 bg-emerald-500/20 text-emerald-400 rounded-2xl w-fit mb-6 group-hover:scale-110 transition-transform">
+            <Leaf size={32} />
+          </div>
+          <h2 className="text-2xl font-black text-white mb-2 tracking-tight">Customer Portal</h2>
+          <p className="text-slate-400 font-medium text-sm leading-relaxed mb-6">
+            Schedule waste pickups, track collections, and manage your recycling activity.
+          </p>
+          <div className="flex items-center gap-2 text-emerald-400 font-black text-xs uppercase tracking-widest group-hover:gap-3 transition-all">
+            Open Portal <ArrowRight size={14} />
+          </div>
+          <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-emerald-500/5 rounded-full blur-2xl" />
+        </button>
+
+        {/* Partner card */}
+        <button
+          onClick={() => setPortal('partner')}
+          className="group relative bg-white/5 hover:bg-white/10 border border-white/10 hover:border-blue-500/60 rounded-[2rem] p-8 text-left transition-all duration-300 hover:shadow-2xl hover:shadow-blue-500/10 active:scale-95 overflow-hidden"
+        >
+          <div className="p-4 bg-blue-500/20 text-blue-400 rounded-2xl w-fit mb-6 group-hover:scale-110 transition-transform">
+            <Truck size={32} />
+          </div>
+          <h2 className="text-2xl font-black text-white mb-2 tracking-tight">Partner Portal</h2>
+          <p className="text-slate-400 font-medium text-sm leading-relaxed mb-6">
+            Manage your logistics fleet, accept pickup orders, and track deliveries in real time.
+          </p>
+          <div className="flex items-center gap-2 text-blue-400 font-black text-xs uppercase tracking-widest group-hover:gap-3 transition-all">
+            Open Portal <ArrowRight size={14} />
+          </div>
+          <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-blue-500/5 rounded-full blur-2xl" />
+        </button>
+      </div>
+
+      <p className="mt-10 text-slate-600 text-xs font-bold">Powered by Firebase · Real-time · Secure</p>
+    </div>
+  );
+}
+
+// Patch App to accept an onSwitchPortal prop so the landing can swap portals
+// (the default export stays App for backward compat with PortalRoot's internal usage)
