@@ -220,6 +220,7 @@ export default function App({ onSwitchPortal }) {
 
     try {
       await addPickup(firebaseUser.uid, {
+        customerName: userProfile?.name || firebaseUser?.email?.split('@')[0] || 'Customer',
         wasteTypes: [...selectedTypes],
         address,
         date: dateValue,

@@ -13,6 +13,7 @@ import { auth } from './firebase/config';
 import { onAuthStateChanged } from 'firebase/auth';
 import { registerUser, loginUser, logoutUser } from './firebase/authService';
 import { saveAgencyProfile, getAgencyProfile } from './firebase/partnerService';
+import { subscribeToAllPickups, updatePickupStatus } from './firebase/pickupService';
 
 // ─── Waste type catalog ─────────────────────────────────────────────────────
 const WASTE_TYPES = {
@@ -57,15 +58,8 @@ const WASTE_TYPES = {
     },
 };
 
-const INITIAL_TASKS = [
-    { id: 'TASK-9283', customerName: 'City Hospital', wasteType: 'biomedical', address: 'Block A, Medical Square', time: '09:00 AM', status: 'pending' },
-    { id: 'TASK-8811', customerName: 'Valley Farms', wasteType: 'agricultural', address: 'Plot 12, Rural North', time: '08:00 AM', status: 'pending' },
-    { id: 'TASK-4412', customerName: 'Steel Works Ltd', wasteType: 'metal', subType: 'metals_core', address: 'Unit 4, Industrial Hub', time: '02:15 PM', status: 'pending' },
-    { id: 'TASK-5501', customerName: 'Factory Corp', wasteType: 'industrial', address: 'Pier 47, Manufacturing Zone', time: '04:00 PM', status: 'pending' },
-    { id: 'TASK-6610', customerName: 'Tech Park A', wasteType: 'electronic', address: 'B-Block IT Center', time: '11:00 AM', status: 'pending' },
-];
-
 // ─── Inline helpers ──────────────────────────────────────────────────────────
+
 const ErrorBanner = ({ message, onDismiss }) => (
     <div className="flex items-center gap-3 bg-red-50 border border-red-200 text-red-700 font-bold text-xs px-4 py-3 rounded-lg">
         <AlertCircle size={16} className="flex-shrink-0" />
@@ -89,7 +83,8 @@ export default function PartnerApp({ onSwitchPortal }) {
     const [selectedFleet, setSelectedFleet] = useState(null);
     const [selectedSubCategory, setSelectedSubCategory] = useState(null);
     const [statusFilter, setStatusFilter] = useState(null);
-    const [tasks, setTasks] = useState(INITIAL_TASKS);
+    const [tasks, setTasks] = useState([]);
+    const [tasksLoading, setTasksLoading] = useState(true);
 
     // ── Registration form ─────────────────────────────────────────────────
     const [reg, setReg] = useState({
@@ -141,6 +136,30 @@ export default function PartnerApp({ onSwitchPortal }) {
         });
         return unsub;
     }, []);
+
+    // ─── Subscribe to ALL pickups (for partner task list) ────────────────────────
+    useEffect(() => {
+        if (!firebaseUser) return;
+        setTasksLoading(true);
+        const unsub = subscribeToAllPickups((rawPickups) => {
+            // Normalise Firestore pickup docs into the task shape the UI expects.
+            // A customer pickup has wasteTypes: ['plastic','paper',...]
+            // We use the first type as the primary wasteType for routing/filtering.
+            const mapped = rawPickups.map(p => ({
+                id: p.id,
+                customerName: p.customerName || 'Customer',
+                wasteType: (p.wasteTypes && p.wasteTypes[0]) || 'plastic',
+                wasteTypes: p.wasteTypes || [],
+                address: p.address || '',
+                time: p.time || '',
+                date: p.date || '',
+                status: p.status || 'pending',
+            }));
+            setTasks(mapped);
+            setTasksLoading(false);
+        });
+        return unsub;
+    }, [firebaseUser]);
 
     // ─── Reverse geocoding ────────────────────────────────────────────────────
     const reverseGeocode = useCallback(async (lat, lng) => {
@@ -244,8 +263,14 @@ export default function PartnerApp({ onSwitchPortal }) {
         setStatusFilter(null);
     };
 
-    const updateTaskStatus = (id, status) =>
-        setTasks(prev => prev.map(t => t.id === id ? { ...t, status } : t));
+    const updateTaskStatus = async (id, newStatus) => {
+        try {
+            await updatePickupStatus(id, newStatus);
+            // onSnapshot will automatically update the local tasks state
+        } catch (err) {
+            console.error('Failed to update pickup status:', err);
+        }
+    };
 
     const handleFleetClick = (key) => {
         setSelectedFleet(key); setSelectedSubCategory(null); setStatusFilter(null); setView('tasks');
@@ -537,12 +562,19 @@ export default function PartnerApp({ onSwitchPortal }) {
                         ) : (
                             /* Task cards */
                             <div className="space-y-6">
-                                {filteredTasks(tasks).length === 0 ? (
+                                {tasksLoading ? (
+                                    <div className="bg-white border border-slate-100 rounded-[3rem] p-24 text-center">
+                                        <Loader2 className="mx-auto text-emerald-400 mb-4 animate-spin" size={48} />
+                                        <p className="text-slate-400 font-black text-sm uppercase tracking-widest">Loading orders…</p>
+                                    </div>
+                                ) : filteredTasks(tasks).length === 0 ? (
                                     <div className="bg-white border-4 border-dashed border-slate-100 rounded-[3rem] p-24 text-center">
                                         <Package className="mx-auto text-slate-100 mb-6" size={80} />
                                         <p className="text-slate-400 font-black text-xl italic uppercase tracking-widest">No Active Orders Found</p>
+                                        <p className="text-slate-300 text-sm mt-3">Customer pickups will appear here in real time.</p>
                                     </div>
                                 ) : (
+
                                     filteredTasks(tasks).map(task => (
                                         <div key={task.id}
                                             className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden flex flex-col md:flex-row group hover:shadow-2xl transition-all duration-300 animate-in fade-in slide-in-from-right-4">
@@ -565,8 +597,9 @@ export default function PartnerApp({ onSwitchPortal }) {
                                                             <User size={18} className="text-slate-300" /> Client: <span className="text-slate-900 font-black">{task.customerName}</span>
                                                         </p>
                                                     </div>
-                                                    <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest border-l-2 border-slate-200 pl-3">
-                                                        <Clock size={16} className="text-slate-200" /> Window: {task.time}
+                                                    <div className="flex items-center gap-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-l-2 border-slate-200 pl-3">
+                                                        <Clock size={16} className="text-slate-200" />
+                                                        <span>{task.date ? `${task.date} · ` : ''}{task.time || 'Time TBD'}</span>
                                                     </div>
                                                 </div>
                                                 <div className="flex flex-col gap-3 min-w-[240px]">
