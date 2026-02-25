@@ -1,0 +1,23 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// Firestore Security Rules
+// Paste these into Firebase Console → Firestore Database → Rules
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// rules_version = '2';
+// service cloud.firestore {
+//   match /databases/{database}/documents {
+//
+//     // Users can only read/write their own profile
+//     match /users/{userId} {
+//       allow read, write: if request.auth != null && request.auth.uid == userId;
+//     }
+//
+//     // Users can only read/write their own pickups
+//     match /pickups/{pickupId} {
+//       allow read, delete: if request.auth != null
+//                           && request.auth.uid == resource.data.uid;
+//       allow create: if request.auth != null
+//                     && request.auth.uid == request.resource.data.uid;
+//     }
+//   }
+// }
